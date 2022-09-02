@@ -1,0 +1,40 @@
+﻿@page "/createorder"
+@page "/createorder/{orderId:int}"
+@using ComputerRepairStore.BlazorApp.Components
+@inject IRepairOrderService orderService
+@inject IUserService userService
+@inject NavigationManager NavManager
+@attribute [Authorize(Policy = nameof(UserType.Customer))]
+
+<CreateRepairOrder @bind-order="order"></CreateRepairOrder>
+
+
+@code {
+    [Parameter]
+    public int orderId { get; set; }
+
+    User user;
+    RepairOrder order;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await userService.GetCurrentUser();
+
+        order = new() { Customer = new(), PlannedFinishDate = DateTime.Now };
+
+        if (orderId > 0 && user.UserType != UserType.Customer)
+        {
+            var tempOrder = await orderService.GetById(orderId);
+            if (tempOrder == null || tempOrder.Deleted)
+            {
+                NavManager.NavigateTo("/createorder", true);
+            }
+            else
+            {
+                order = tempOrder;
+            }
+        }
+
+        await base.OnInitializedAsync();
+    }
+}

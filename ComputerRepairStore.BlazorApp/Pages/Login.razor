@@ -1,0 +1,76 @@
+﻿@page "/"
+@page "/login"
+@inject IUserService service
+@inject NavigationManager navigationManager
+@inject IUserService UserService
+@using ComputerRepairStore.BlazorApp.Identity
+@using ComputerRepairStore.Domain.Entities.Input
+@using Microsoft.AspNetCore.Identity
+@using System.Threading.Tasks
+
+<div class="row d-flex justify-content-center">
+    <div class="card ">
+        <div class="card-header bg-light">
+            <span class="oi oi-wrench d-inline"></span>
+            <div class="d-inline font-weight-bold">Login</div>
+        </div>
+        <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            @if(error != null)
+            {
+                <p>@error</p>
+            }
+            <div class="card-body">
+                <div>
+                    <label class="float-left">Username: </label>
+                    <InputText class="float-right" id="email" type="email" @bind-Value="model.Email" />
+                </div>
+                <hr />
+                <div>
+                    <label class="float-left">Password: </label>
+                    <InputText class="float-right" id="password" type="password" @bind-Value="model.Password" />
+                </div>
+                <div>
+                    <button type="submit" role="button" aria-pressed="true" class="float-right btn btn-light m-1">Submit</button>
+                    <div class="breadcrumb-item m-1 float-left"><a href="/customerregister">Register account</a></div>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private string error;
+    private LoginInputModel model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (await service.GetCurrentUser() != null)
+        {
+            navigationManager.NavigateTo("/repairlist");
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        error = null;
+        bool valid = false;
+
+        try
+        {
+            valid = await service.IsValidLogin(model);
+        }
+        catch(Exception)
+        {
+            error = "Incorrect login information.";
+        }
+
+        if(valid)
+        {
+            navigationManager.NavigateTo($"/_identity/login?key={LoginMiddleware.AddLoginRequest(model)}&endpoint=/repairlist", true);
+        }
+
+    }
+}

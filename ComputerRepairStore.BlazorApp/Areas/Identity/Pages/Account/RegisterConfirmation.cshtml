@@ -1,0 +1,34 @@
+﻿@page
+@model RegisterConfirmationModel
+@{
+    Layout = "_EmptyLayout";
+    ViewData["Title"] = "Register confirmation";
+}
+
+@{
+    if (@Model.DisplayConfirmAccountLink)
+    {
+        <p>
+            This app does not currently have a real email sender registered, see <a href="https://aka.ms/aspaccountconf">these docs</a> for how to configure a real email sender.
+            Normally this would be emailed: <a id="confirm-link" href="@Model.EmailConfirmationUrl">Click here to confirm your account</a>
+        </p>
+    }
+    else
+    {
+        <br />
+        <div class="row d-flex justify-content-center">
+            <div class="card" style="width: 34rem;">
+                <div class="card-header bg-light">
+                    <span class="oi oi-wrench d-inline"></span>
+                    <div class="d-inline font-weight-bold">Confirm your email</div>
+                </div>
+                <div class="card-body">
+                    <div style="width:100%;height:0;padding-bottom:66%;position:relative;"><iframe src="https://giphy.com/embed/s2qXK8wAvkHTO" width="100%" height="100%" style="position:absolute" frameBorder="0" class="giphy-embed" allowFullScreen></iframe></div><p><a href="https://giphy.com/gifs/party-birthday-celebration-s2qXK8wAvkHTO">via GIPHY</a></p>
+                    <div>
+                        <p>Thanks for your registration, please confirm your email</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

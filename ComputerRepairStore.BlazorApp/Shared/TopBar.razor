@@ -1,0 +1,29 @@
+﻿@inject IUserService userService
+@inject NavigationManager NavManager
+
+<div class="navbar navbar-light bg-primary sticky-top p-5">
+    <div class="d-inline-block">
+        <span class="oi oi-wrench d-inline"></span>
+        <a class="navbar-brand d-inline font-weight-bold" href="/">ComputerRepair</a>
+        @if (loggedin)
+        {
+            <a class="btn btn-secondary form-inline" href="/_identity/logout">Log Out</a>
+        }
+    </div>
+</div>
+
+@code {
+    bool loggedin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        loggedin = await userService.GetCurrentUser() != null;
+
+        await base.OnInitializedAsync();
+    }
+
+    public void OnLogout()
+    {
+        NavManager.NavigateTo("/_identity/logout");
+    }
+}

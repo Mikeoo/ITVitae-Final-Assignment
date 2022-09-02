@@ -1,0 +1,368 @@
+﻿@using System.Threading
+@using System.IO
+@using System.Net.Http.Headers
+@using System.Text.Json
+@using System.Data.OleDb
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity.UI.Services
+@inject IRepairOrderService orderService
+@inject IUserService userService
+@inject NavigationManager NavManager
+@inject IEmailSender _emailSender
+
+<div class="row">
+    <div class="@descriptionLayout">
+        <h3>Repairs / Create</h3>
+        <div class="row">
+            <div class="col">
+                <label class="@alertShort " for="ShortDescription">Short Description of the order (around 3 words)</label>
+            </div>
+        </div>
+
+        <div>
+            <input class="form-control" type="text" @bind-value="order.ShortDescription" />
+        </div>
+
+        <div class="row">
+            <div class="col-3">
+                <label class="@alert" for="Description">Description</label>
+            </div>
+        </div>
+
+        <div class="row" style="min-width:275px">
+            <div class="col-xl">
+                <textarea class="form-control" id="Description" rows="5" @bind="order.Description"></textarea>
+            </div>
+            @if (user.UserType == UserType.Customer)
+            {
+                <div class="col, buttons">
+                    <div>
+                        <button class="btn btn-success mb-2" @onclick="async () => await OnCreate()">Create</button>
+                    </div>
+                    <div>
+                        <button class="btn btn-danger mb-2" @onclick="() => OnCancel()">Cancel</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (user.UserType != UserType.Customer)
+        {
+            <div class="row">
+                <div class="col-6">
+                    <label>Estimated enddate</label>
+                    <input class="form-control" type="date" @bind-value="order.PlannedFinishDate" />
+                </div>
+            </div>
+            <hr />
+        }
+        <div class="row">
+            <div class="col-6">
+                @for (var i = 0; i < order.Photos.Count; i++)
+                {
+                    <a href="@order.Photos[i]" target="_blank"><img src="@order.Photos[i]" class="img-list" alt="@("img" + i)" /></a>
+                }
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-3">
+                <label for="imageUpload" class="form-label">Pictures</label>
+                <InputFile class="form-control" style="min-width:350px" id="imageUpload" OnChange="@OnPhotoChange" multiple accept="image/*" />
+            </div>
+        </div>
+    </div>
+
+    @if (user.UserType != UserType.Customer)
+    {
+        <form class="col-sm align-content-center">
+            <h4>Customer Information</h4>
+            <div>
+                <label>Name:</label>
+                <input class="float-right w-75" type="text" @bind-value="order.Customer.FirstName" />
+            </div>
+            <div>
+                <label>Lastname:</label>
+                <input class="float-right w-75" type="text" @bind-value="order.Customer.LastName" />
+            </div>
+            <div>
+                <label>Email:</label>
+                <input class="float-right w-75" type="email" @bind-value="order.Customer.Email" />
+            </div>
+            <div>
+                <label>Phone:</label>
+                <input class="float-right w-75" type="tel" @bind-value="order.Customer.PhoneNumber" />
+            </div>
+            <div>
+                <label>Zipcode:</label>
+                <input class="float-right w-75" type="text" @bind-value="order.Customer.ZipCode" />
+            </div>
+            <div>
+                <label>City:</label>
+                <input class="float-right w-75" type="text" @bind-value="order.Customer.City" />
+            </div>
+        </form>
+
+        <div class="card col-sm w-25">
+            <button class="btn btn-outline-dark m-3" @onclick="() => OnSave()">Save</button>
+            <button type="button" class="btn btn-outline-dark m-3" data-toggle="modal" data-target="#cancelModal">Delete</button>
+            <button class="btn btn-outline-dark m-3" @onclick="() => OnFinish()">Finish</button>
+            <button class="btn btn-outline-dark m-3" @onclick="() => OnCancel()">Cancel</button>
+        </div>
+    }
+</div>
+
+@if (user.UserType != UserType.Customer)
+{
+    <hr />
+    <div class="col-2">
+        <h4>Status</h4>
+        <select class="form-control" value="@((int)order.RepairStatus)" name="features" @onchange="OnStatusSelect">
+            <option value="0">Received</option>
+            <option value="1">Waiting for parts</option>
+            <option value="2">In process</option>
+            <option value="3">Finished</option>
+            <option value="4">Cancelled</option>
+        </select>
+    </div>
+
+
+}
+
+<div class="modal fade" id="cancelModal" tabindex="-1" role="dialog" aria-labelledby="cancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="alertdialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cancel Order</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <label>Reason for canceling order</label>
+                <div class="col-xl">
+                    <textarea class="form-control" id="Description" rows="5" @bind="cancelComment"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" @onclick="() => OnCancelDelete()">Cancel</button>
+                @if (string.IsNullOrEmpty(cancelComment))
+                {
+                    <button type="button" class="btn btn-danger" disabled>Delete</button>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-danger" @onclick="async () => await OnDelete()">Delete</button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public RepairOrder order { get; set; }
+
+    [Parameter]
+    public EventCallback<RepairOrder> orderChanged { get; set; }
+
+    DateTime now;
+    RepairStatus OldStatus;
+
+    User user;
+    string ChosenStatus;
+
+    string alert = "";
+    string alertShort = "";
+
+    string cancelComment;
+
+    string descriptionLayout;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await userService.GetCurrentUser();
+
+        if (user.UserType == UserType.Customer)
+        {
+            descriptionLayout = "w-50";
+
+            order.Customer = user;
+        }
+        else
+        {
+            descriptionLayout = "col-md w-75";
+        }
+
+        await base.OnInitializedAsync();
+    }
+
+    protected override void OnInitialized()
+    {
+        now = DateTime.Now;
+
+        if (order == null || order.Customer == null)
+        {
+            order = new() { Customer = new(), PlannedFinishDate = now };
+            ChosenStatus = order.RepairStatus.ToString();
+        }
+        else
+        {
+            OldStatus = order.RepairStatus;
+            ChosenStatus = RepairStatus.Received.ToString();
+        }
+        base.OnInitialized();
+    }
+
+    public void OnStatusSelect(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value.ToString(), out int result))
+        {
+            order.RepairStatus = (RepairStatus)result;
+            ChosenStatus = ((RepairStatus)result).ToString();
+        }
+
+        StateHasChanged();
+    }
+
+    public async Task OnPhotoChange(InputFileChangeEventArgs e)
+    {
+        HttpClient client = null;
+        try
+        {
+            client = new HttpClient();
+
+            foreach (var file in e.GetMultipleFiles())
+            {
+                MultipartFormDataContent content = null;
+                Stream stream = null;
+                StreamContent streamContent = null;
+                try
+                {
+                    content = new MultipartFormDataContent("upload");
+                    stream = file.OpenReadStream(16000000); // 16 MB
+                    streamContent = new StreamContent(stream);
+                    streamContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+
+                    content.Add(streamContent, "upload", file.Name);
+
+                    var response = await client.PostAsync("Removed", content);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        order.Photos.Add(response.RequestMessage.RequestUri.ToString());
+                    }
+                }
+                finally
+                {
+                    stream?.Dispose();
+                    streamContent?.Dispose();
+                    content?.Dispose();
+                }
+            }
+        }
+        finally
+        {
+            client?.Dispose();
+        }
+    }
+
+    public async Task OnCreate()
+    {
+        if (string.IsNullOrEmpty(order.Description) && string.IsNullOrEmpty(order.ShortDescription))
+        {
+            alert = "alert-danger";
+            alertShort = "alert-danger";
+        }
+        else if (string.IsNullOrEmpty(order.Description))
+        {
+            alert = "alert-danger";
+            alertShort = "";
+        }
+        else if (string.IsNullOrEmpty(order.ShortDescription))
+        {
+            alertShort = "alert-danger";
+            alert = "";
+        }
+        else
+        {
+            order.RegistrationDate = DateTime.Now;
+
+            order.Customer = user;
+
+            await orderService.Create(order);
+
+            await _emailSender.SendEmailAsync(order.Customer.Email, "Order Created!",
+                $"Order {order.ShortDescription} Created. {order.Description}");
+
+            NavManager.NavigateTo("repairlist", true);
+        }
+    }
+
+    public async Task OnDelete()
+    {
+        if (!string.IsNullOrEmpty(cancelComment))
+        {
+            order.CommentCancellation = cancelComment;
+            order.RepairStatus = RepairStatus.Cancelled;
+
+            await orderService.Update(order);
+
+            await StatusEmail(order.RepairStatus);
+
+            NavManager.NavigateTo("repairlist", true);
+        }
+        else
+        {
+            StateHasChanged();
+        }
+    }
+
+    public void OnCancel()
+    {
+        NavManager.NavigateTo("repairlist", true);
+    }
+
+    public void OnCancelDelete()
+    {
+        cancelComment = string.Empty;
+    }
+
+    private async Task OnSave()
+    {
+        if (order.RepairStatus != RepairStatus.Received)
+        {
+            order.EmployeeId = user.Id;
+            order.Employee = user;
+        }
+
+        if (OldStatus.ToString() != ChosenStatus)
+        {
+            await StatusEmail(order.RepairStatus);
+        }
+        await orderService.Update(order);
+
+        NavManager.NavigateTo("repairlist", true);
+    }
+
+    private async Task OnFinish()
+    {
+        if (string.IsNullOrEmpty(order.EmployeeId))
+        {
+            order.EmployeeId = user.Id;
+            order.Employee = user;
+        }
+
+        order.RepairStatus = RepairStatus.Finished;
+
+        await StatusEmail(order.RepairStatus);
+
+        await OnSave();
+
+    }
+
+    private async Task StatusEmail(RepairStatus status)
+    {
+        await _emailSender.SendEmailAsync(order.Customer.Email, "Order Status Changed",
+            $"Your order status has changed to: {status} {order.CommentCancellation}");
+    }
+}

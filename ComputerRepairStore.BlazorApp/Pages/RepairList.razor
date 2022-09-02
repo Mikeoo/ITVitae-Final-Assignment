@@ -1,0 +1,385 @@
+﻿@page "/repairlist"
+@page "/repairlist/{Page:int}"
+@attribute [Authorize(Policy = nameof(UserType.Customer))]
+@using ComputerRepairStore.BlazorApp.Components
+@using ComputerRepairStore.Business.Context
+@using System.Threading
+@using ComputerRepairStore.Domain.Interfaces
+@inject IRepairOrderService orderService
+@inject IUserService userService
+@inject NavigationManager NavManager
+
+<nav class="navbar navbar-expand-lg">
+    <a class="navbar-brand">Repairs</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mx-auto">
+            <li class="nav-item dropdown btn">
+                <a class="nav-link dropdown-toggle btn-primary" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    @Show
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <a class="dropdown-item" @onclick="() => OnShowAll()">Show all</a>
+                    <a class="dropdown-item" @onclick="() => OnShow(RepairStatus.Received)">Received</a>
+                    <a class="dropdown-item" @onclick="() => OnShow(RepairStatus.WaitingForParts)">Waiting For Parts</a>
+                    <a class="dropdown-item" @onclick="() => OnShow(RepairStatus.InProcess)">In Process</a>
+                    <a class="dropdown-item" @onclick="() => OnShow(RepairStatus.Finished)">Finished</a>
+                    <a class="dropdown-item" @onclick="() => OnShow(RepairStatus.Cancelled)">Cancelled</a>
+                </div>
+            </li>
+            <li class="nav-item dropdown btn">
+                <a class="nav-link dropdown-toggle btn-primary" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    @Sorter
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    <button class="dropdown-item" @onclick="() => OnSort(SortBy.Order)">Order</button>
+                    <button class="dropdown-item" @onclick="() => OnSort(SortBy.RegistrationDate)">Registration Date</button>
+                    <button class="dropdown-item" @onclick="() => OnSort(SortBy.RepairStatus)">Repair Status</button>
+                    <button class="dropdown-item" @onclick="() => OnSort(SortBy.PlannedFinishDate)">Planned finish Date</button>
+                    <button class="dropdown-item" @onclick="() => OnSort(SortBy.Customer)">Customer</button>
+                    <button class="dropdown-item" @onclick="() => OnSort(SortBy.Employee)">Employee</button>
+
+                </div>
+            </li>
+            <li>
+
+            </li>
+        </ul>
+        <form class="form-inline my-2 my-lg-0 m-3" @onsubmit="() => OnSearch(SearchQuery)">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Search" @bind-value="SearchQuery">
+                <div class="input-group-append">
+                    <button class="btn btn-outline-secondary" type="button" @onclick="() => OnSearch(SearchQuery)">Search</button>
+                </div>
+            </div>
+            @if (user.UserType == UserType.Customer)
+            {
+                <a class="btn btn-outline-dark my-2 my-sm-0 m-3" href="/createorder">Create</a>
+            }
+        </form>
+    </div>
+</nav>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Order</th>
+            <th>Registration Date</th>
+            <th>Status</th>
+            <th>Planned Finish Date</th>
+            @if (user.UserType != UserType.Customer)
+            {
+                <th>Customer</th>
+            }
+            <th>Employee</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var repairOrder in orders)
+        {
+            <tr>
+                <th>@repairOrder.ShortDescription</th>
+                <th>@repairOrder.RegistrationDate.ToString("dd-MM-yyyy")</th>
+                <th>@repairOrder.RepairStatus</th>
+                @if (repairOrder.RepairStatus != RepairStatus.Received)
+                {
+                    if (repairOrder.PlannedFinishDate < DateTime.Now)
+                    {
+                        <th class="alert-danger text-danger">@repairOrder.PlannedFinishDate.ToString("dd-MM-yyyy")</th>
+                    }
+                    else
+                    {
+                        <th>@repairOrder.PlannedFinishDate.ToString("dd-MM-yyyy")</th>
+                    }
+                }
+                else
+                {
+                    <th>Not yet planned</th>
+                }
+
+                @if (user.UserType != UserType.Customer)
+                {
+                    <th>@repairOrder.Customer.UserName</th>
+                }
+
+
+                @if (repairOrder.Employee != null)
+                {
+                    <th>@repairOrder.Employee.FirstName</th>
+                }
+                else
+                {
+                    <th>Not yet assigned</th>
+                }
+
+                <th>
+                    <div class="row">
+                        <div class="col">
+                            <button type="button" class="btn btn-primary m-1" data-toggle="modal" data-target="#viewModal" @onclick="() => OnModal(repairOrder)">View</button>
+                            @if (user.UserType != UserType.Customer)
+                            {
+                                <button class="btn btn-primary" @onclick="() => OnEdit(repairOrder)">Edit</button>
+                                <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#deleteModal" @onclick="() => OnModal(repairOrder)">Delete</button>
+                            }
+                        </div>
+                    </div>
+                </th>
+            </tr>
+        }
+
+    </tbody>
+    <tfoot>
+    </tfoot>
+</table>
+
+<nav class="float-right" aria-label="Page navigation example">
+    <Paging PI="pagingInfo" PageClassesEnabled="true" PageClass="Paging" PageClassSelected="active"></Paging>
+</nav>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="alertdialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete @selectedOrder.Customer's order?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" @onclick="async () => await OnDelete(selectedOrder.Id)">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="viewModal" tabindex="-1" role="dialog" aria-labelledby="viewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="alertdialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@selectedOrder.ShortDescription</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <h5>Repair Status</h5>
+                    <div>@selectedOrder.RepairStatus.ToString()</div>
+                </div>
+                <hr />
+                @if (selectedOrder.RepairStatus != RepairStatus.Cancelled)
+                {
+                    <div>
+                        <h5>Registration Date</h5>
+                        <div>@selectedOrder.RegistrationDate.ToString("dd-MM-yyyy")</div>
+                    </div>
+                    <hr />
+                    <div>
+                        <h5>Details</h5>
+                        <div>@selectedOrder.Description</div>
+                    </div>
+                    <hr />
+                    <div>
+                        <h5>Acceptation Date</h5>
+                        @if (selectedOrder.RepairStatus == RepairStatus.Received)
+                        {
+                            <div>Order not picked up yet</div>
+                        }
+                        else
+                        {
+                            <div>@selectedOrder.RegistrationDate.ToString("dd-MM-yyyy")</div>
+                        }
+                    </div>
+                    <hr />
+                    <div>
+                        <h5>Planned Finish Date</h5>
+                        @if (selectedOrder.RepairStatus == RepairStatus.Received)
+                        {
+                            <div>Order not picked up yet</div>
+                        }
+                        else
+                        {
+                            <div>@selectedOrder.PlannedFinishDate.ToString("dd-MM-yyyy")</div>
+                        }
+                    </div>
+                    <hr />
+                    <div>
+                        <h5>Employee working on it</h5>
+                        @if (selectedOrder.RepairStatus == RepairStatus.Received)
+                        {
+                            <div>Order not picked up yet</div>
+                        }
+                        else
+                        {
+                            <div>@selectedOrder.Employee.FirstName</div>
+                        }
+                    </div>
+                    <hr />
+                    <div>
+                        <h5>Photos</h5>
+                        <div class="row">
+                            @for (var i = 0; i < selectedOrder.Photos.Count; i++)
+                            {
+                                <a href="@selectedOrder.Photos[i]" target="_blank"><img src="@selectedOrder.Photos[i]" class="img-list" alt="@("img" + i)" /></a>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div>
+                        <h5>Reason for Cancellation:</h5>
+                        <div>@selectedOrder.CommentCancellation</div>
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                @if (user.UserType != UserType.Customer)
+                {
+                    <button type="button" class="btn btn-primary" data-dismiss="modal" @onclick="() => OnEdit(selectedOrder)">Edit</button>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int page { get; set; }
+
+    PagingInfo pagingInfo = new PagingInfo();
+
+    string Sorter = "Sort By";
+    string Show = "Show";
+    string SearchQuery = string.Empty;
+
+    User user;
+
+    private List<RepairOrder> allOrders;
+    private List<RepairOrder> orders;
+
+    private RepairOrder selectedOrder;
+
+    protected override void OnParametersSet()
+    {
+        CreatePagingInfo();
+    }
+
+    public void CreatePagingInfo()
+    {
+        var AllRepairOrders = allOrders;
+
+        int PageSize = 5;
+        pagingInfo = new PagingInfo();
+        page = page == 0 ? 1 : page;
+        pagingInfo.CurrentPage = page;
+        pagingInfo.TotalItems = allOrders.Count();
+        pagingInfo.ItemsPerPage = PageSize;
+
+        var skip = PageSize * (Convert.ToInt32(page) - 1);
+        orders = AllRepairOrders.Skip(skip).Take(PageSize).ToList();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await userService.GetCurrentUser();
+
+        orders = orderService.GetAll(user).ToList();
+
+        allOrders = orders;
+        selectedOrder = new();
+
+        await base.OnInitializedAsync();
+    }
+
+    public void OnSort(SortBy sortBy)
+    {
+        orders = orderService.GetAll(user).ToList();
+        orders = orderService.OrderBy(orders, sortBy);
+        allOrders = orders;
+        Sorter = sortBy.ToString();
+        Show = "Show";
+        CreatePagingInfo();
+        StateHasChanged();
+    }
+
+    public void OnShow(RepairStatus status)
+    {
+        orders = orderService.GetAll(user).Where(x =>
+                    x.RepairStatus == status &&
+                    x.Deleted == false).ToList();
+
+        Show = status.ToString();
+        Sorter = "Sort By";
+
+        allOrders = orders;
+        CreatePagingInfo();
+        StateHasChanged();
+    }
+
+
+    public void OnShowAll()
+    {
+        orders = orderService.GetAll(user).ToList();
+
+        Show = "Show";
+        Sorter = "Sort By";
+
+        allOrders = orders;
+        CreatePagingInfo();
+        StateHasChanged();
+    }
+
+    public void OnSearch(string query)
+    {
+        orders = orderService.Search(query, user).ToList();
+
+        allOrders = orders;
+        CreatePagingInfo();
+        StateHasChanged();
+    }
+
+    public void OnModal(RepairOrder order)
+    {
+        selectedOrder = order;
+    }
+
+    public async Task OnDelete(int id)
+    {
+        await orderService.Delete(id);
+        StateHasChanged();
+
+        var url = NavManager.Uri;
+        var pageNum = url.TakeLast(1).First() - '0';
+        var prevPageNum = Convert.ToInt32(pageNum) - 1;
+        var prevPage = url.Remove(url.Length - 1) + prevPageNum;
+
+        if (orders.Count > 1)
+        {
+            NavManager.NavigateTo(url, true);
+        }
+        else
+        {
+            NavManager.NavigateTo(prevPage, true);
+        }
+    }
+
+    public void OnEdit(RepairOrder order)
+    {
+        NavManager.NavigateTo($"/createorder/{order.Id}");
+    }
+
+    public void Enter(KeyboardEventArgs e)
+    {
+        if (e.Code == "Enter" || e.Code == "NumpadEnter")
+            OnSearch(SearchQuery);
+    }
+}

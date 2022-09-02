@@ -1,0 +1,69 @@
+﻿@page "/customerregister"
+@model CustomerRegisterModel
+@{
+    Layout = "_EmptyLayout";
+    ViewData["Title"] = "Register";
+}
+<br />
+<div class="row d-flex justify-content-center">
+    <div class="card" style="width: 34rem;">
+        <div class="card-header bg-light">
+            <span class="oi oi-wrench d-inline"></span>
+            <div class="d-inline font-weight-bold">Customer Register</div>
+        </div>
+        <div class="card-body">
+            <form asp-route-returnUrl="@Model.ReturnUrl" method="post">
+                <h4>Create a new account.</h4>
+                <hr />
+                <div asp-validation-summary="All" class="text-danger"></div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for=" Input.Email">Email</label>
+                    <input class="col-sm-7" asp-for="Input.Email" class="form-control" />
+                    <span asp-validation-for="Input.Email" class="text-danger"></span>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for="Input.Password">Password</label>
+                    <input class ="col-sm-7" asp-for="Input.Password" class="form-control" />
+                    <span asp-validation-for="Input.Password" class="text-danger"></span>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for="Input.ConfirmPassword">Confirm password</label>
+                    <input class="col-sm-7" asp-for="Input.ConfirmPassword" class="form-control" />
+                    <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for="Input.FirstName">FirstName</label>
+                    <input class="col-sm-7" asp-for="Input.FirstName" class="form-control" />
+                    <span asp-validation-for="Input.FirstName" class="text-danger"></span>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for="Input.LastName">LastName</label>
+                    <input class="col-sm-7" asp-for="Input.LastName" class="form-control" />
+                    <span asp-validation-for="Input.LastName" class="text-danger"></span>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for="Input.ZipCode">Zip Code</label>
+                    <input class="col-sm-7" asp-for="Input.ZipCode" class="form-control" />
+                    <span asp-validation-for="Input.ZipCode" class="text-danger"></span>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for="Input.City">City</label>
+                    <input class="col-sm-7" asp-for="Input.City" class="form-control" />
+                    <span asp-validation-for="Input.City" class="text-danger"></span>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-5" asp-for="Input.PhoneNumber">Mobile Nr.</label>
+                    <input class="col-sm-7" asp-for="Input.PhoneNumber" class="form-control" />
+                    <span asp-validation-for="Input.PhoneNumber" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary float-right">Register</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
